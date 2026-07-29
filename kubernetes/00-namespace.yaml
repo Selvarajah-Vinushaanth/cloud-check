@@ -1,0 +1,9 @@
+---
+# Namespace for all Cloud Summit workloads
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cloud-summit
+  labels:
+    app.kubernetes.io/part-of: cloud-summit-2026
+    environment: production

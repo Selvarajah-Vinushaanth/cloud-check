@@ -1,0 +1,9 @@
+{
+  "name": "seat-notifier",
+  "version": "1.0.0",
+  "description": "AWS Lambda - writes seat-low notifications to S3",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1509.0"
+  }
+}

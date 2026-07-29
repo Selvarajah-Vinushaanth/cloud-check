@@ -1,0 +1,24 @@
+{
+  "name": "analytics-collector",
+  "version": "1.0.0",
+  "description": "Analytics Collector - receives frontend events and streams to ClickHouse",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.1.5",
+    "cors": "^2.8.5",
+    "joi": "^17.11.0",
+    "prom-client": "^15.1.0",
+    "morgan": "^1.10.0",
+    "@clickhouse/client": "^0.2.9"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

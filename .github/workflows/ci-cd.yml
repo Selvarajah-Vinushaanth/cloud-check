@@ -1,0 +1,333 @@
+name: Cloud Summit 2026 — CI/CD Blue-Green Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: ap-south-1
+  EKS_CLUSTER_NAME: cloud-summit-eks
+  K8S_NAMESPACE: cloud-summit
+  REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com
+
+jobs:
+  # ===========================================================
+  # JOB 1: Test all services
+  # ===========================================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [event-service, program-service, registration-service, analytics-collector]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Run linting
+        working-directory: services/${{ matrix.service }}
+        run: npm run lint --if-present
+
+      - name: Run tests
+        working-directory: services/${{ matrix.service }}
+        run: npm test --if-present
+
+  # ===========================================================
+  # JOB 2: Security scanning (SAST / dependency audit)
+  # ===========================================================
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit npm dependencies
+        run: |
+          for svc in event-service program-service registration-service analytics-collector; do
+            cd services/$svc && npm audit --audit-level=high && cd ../..
+          done
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true
+
+  # ===========================================================
+  # JOB 3: Build & Push Docker images to AWS ECR
+  # ===========================================================
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [test, security-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.short-sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: meta
+        run: echo "short-sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push — event-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/event-service
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/event-service:${{ steps.meta.outputs.short-sha }}
+            ${{ env.REGISTRY }}/event-service:green
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push — program-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/program-service
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/program-service:${{ steps.meta.outputs.short-sha }}
+            ${{ env.REGISTRY }}/program-service:green
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push — registration-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/registration-service
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/registration-service:${{ steps.meta.outputs.short-sha }}
+            ${{ env.REGISTRY }}/registration-service:green
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push — analytics-collector
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/analytics-collector
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/analytics-collector:${{ steps.meta.outputs.short-sha }}
+            ${{ env.REGISTRY }}/analytics-collector:green
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push — frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/frontend:${{ steps.meta.outputs.short-sha }}
+            ${{ env.REGISTRY }}/frontend:green
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ===========================================================
+  # JOB 4: Deploy Lambda (seat-notifier)
+  # ===========================================================
+  deploy-lambda:
+    name: Deploy Serverless Lambda
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Install Lambda dependencies
+        working-directory: serverless/seat-notifier
+        run: npm ci --omit=dev
+
+      - name: SAM Build & Deploy
+        working-directory: serverless/seat-notifier
+        run: |
+          sam build
+          sam deploy \
+            --stack-name cloud-summit-serverless \
+            --capabilities CAPABILITY_IAM \
+            --no-confirm-changeset \
+            --region ${{ env.AWS_REGION }}
+
+  # ===========================================================
+  # JOB 5: Blue-Green Deployment to EKS
+  # ===========================================================
+  deploy-blue-green:
+    name: Blue-Green Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-lambda]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    env:
+      IMAGE_TAG: ${{ needs.build-and-push.outputs.image-tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Step 1 — Update Green deployment images
+        run: |
+          REGISTRY=${{ env.REGISTRY }}
+          TAG=${{ env.IMAGE_TAG }}
+          NS=${{ env.K8S_NAMESPACE }}
+          for svc in event-service program-service registration-service analytics-collector frontend; do
+            echo "[1] Updating ${svc}-green with image :${TAG}"
+            kubectl set image deployment/${svc}-green \
+              ${svc}=${REGISTRY}/${svc}:${TAG} -n ${NS}
+          done
+
+      - name: Step 2 — Scale up Green deployments (2 replicas)
+        run: |
+          NS=${{ env.K8S_NAMESPACE }}
+          for svc in event-service program-service registration-service analytics-collector frontend; do
+            echo "[2] Scaling up ${svc}-green"
+            kubectl scale deployment/${svc}-green --replicas=2 -n ${NS}
+          done
+
+      - name: Step 3 — Wait for Green deployments ready
+        run: |
+          NS=${{ env.K8S_NAMESPACE }}
+          for svc in event-service program-service registration-service analytics-collector frontend; do
+            echo "[3] Waiting for ${svc}-green to be ready..."
+            kubectl rollout status deployment/${svc}-green -n ${NS} --timeout=120s
+          done
+
+      - name: Step 4 — Smoke test Green deployments
+        run: |
+          NS=${{ env.K8S_NAMESPACE }}
+          # Test event-service health
+          kubectl port-forward -n ${NS} deployment/event-service-green 3001:3001 &
+          PFPID=$!
+          sleep 5
+          STATUS=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:3001/health || echo "FAIL")
+          kill ${PFPID} 2>/dev/null || true
+          if [ "${STATUS}" != "200" ]; then
+            echo "Smoke test FAILED for event-service-green (status=${STATUS})"
+            exit 1
+          fi
+          echo "[4] Smoke tests PASSED"
+
+      - name: Step 5 — Switch Service selectors to Green
+        run: |
+          NS=${{ env.K8S_NAMESPACE }}
+          for svc in event-service program-service registration-service analytics-collector frontend; do
+            echo "[5] Switching ${svc} traffic → green"
+            kubectl patch service/${svc} -n ${NS} \
+              --type='json' \
+              -p='[{"op":"replace","path":"/spec/selector/version","value":"green"}]'
+          done
+
+      - name: Step 6 — Scale down Blue deployments
+        run: |
+          NS=${{ env.K8S_NAMESPACE }}
+          for svc in event-service program-service registration-service analytics-collector frontend; do
+            echo "[6] Scaling down ${svc}-blue"
+            kubectl scale deployment/${svc}-blue --replicas=0 -n ${NS}
+          done
+
+      - name: Step 7 — Promote Green image as Blue for next cycle
+        run: |
+          REGISTRY=${{ env.REGISTRY }}
+          TAG=${{ env.IMAGE_TAG }}
+          for svc in event-service program-service registration-service analytics-collector frontend; do
+            echo "[7] Retagging ${svc}:${TAG} as :blue"
+            docker pull ${REGISTRY}/${svc}:${TAG}
+            docker tag  ${REGISTRY}/${svc}:${TAG} ${REGISTRY}/${svc}:blue
+            docker push ${REGISTRY}/${svc}:blue
+          done
+
+      - name: Deployment complete
+        run: |
+          echo "======================================================"
+          echo " DEPLOYMENT COMPLETE"
+          echo " Tag:     ${{ env.IMAGE_TAG }}"
+          echo " Active:  GREEN"
+          echo " Standby: BLUE (0 replicas, ready for next deploy)"
+          echo "======================================================"
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} -o wide
+
+  # ===========================================================
+  # JOB 6: Automatic rollback on deploy failure
+  # ===========================================================
+  rollback:
+    name: Auto-Rollback to Blue
+    runs-on: ubuntu-latest
+    needs: deploy-blue-green
+    if: failure() && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --region ${{ env.AWS_REGION }} \
+            --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Rollback — Restore Blue traffic
+        run: |
+          NS=${{ env.K8S_NAMESPACE }}
+          for svc in event-service program-service registration-service analytics-collector frontend; do
+            kubectl patch service/${svc} -n ${NS} \
+              --type='json' \
+              -p='[{"op":"replace","path":"/spec/selector/version","value":"blue"}]'
+            kubectl scale deployment/${svc}-blue  --replicas=2 -n ${NS}
+            kubectl scale deployment/${svc}-green --replicas=0 -n ${NS}
+          done
+          echo "ROLLBACK COMPLETE — Traffic restored to BLUE"

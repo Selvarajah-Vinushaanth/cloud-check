@@ -1,0 +1,234 @@
+---
+# ============================================================
+# Event Service - Blue Deployment (active)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service-blue
+  namespace: cloud-summit
+  labels:
+    app: event-service
+    version: blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: event-service
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: event-service
+        version: blue
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "3001"
+    spec:
+      containers:
+        - name: event-service
+          image: 516962256649.dkr.ecr.ap-south-1.amazonaws.com/event-service:blue   # replaced by CI/CD
+          ports:
+            - containerPort: 3001
+          env:
+            - name: PORT
+              value: "3001"
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: events_db
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: DB_SSL
+              value: "false"
+            - name: NODE_ENV
+              value: production
+            - name: SEATS_LOW_THRESHOLD
+              value: "10"
+            - name: SEAT_NOTIFIER_LAMBDA
+              value: seat-notifier
+            - name: AWS_REGION
+              value: ap-south-1
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: aws-secret-access-key
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+
+---
+# ============================================================
+# Event Service - Green Deployment (staging / new version)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-service-green
+  namespace: cloud-summit
+  labels:
+    app: event-service
+    version: green
+spec:
+  replicas: 0   # starts at 0; CI/CD scales up before switching traffic
+  selector:
+    matchLabels:
+      app: event-service
+      version: green
+  template:
+    metadata:
+      labels:
+        app: event-service
+        version: green
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "3001"
+    spec:
+      containers:
+        - name: event-service
+          image: 516962256649.dkr.ecr.ap-south-1.amazonaws.com/event-service:green   # replaced by CI/CD
+          ports:
+            - containerPort: 3001
+          env:
+            - name: PORT
+              value: "3001"
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: events_db
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: DB_SSL
+              value: "false"
+            - name: NODE_ENV
+              value: production
+            - name: SEATS_LOW_THRESHOLD
+              value: "10"
+            - name: SEAT_NOTIFIER_LAMBDA
+              value: seat-notifier
+            - name: AWS_REGION
+              value: ap-south-1
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: aws-secret-access-key
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 15
+
+---
+# ============================================================
+# Event Service - Service (selector points to active colour)
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-service
+  namespace: cloud-summit
+  labels:
+    app: event-service
+spec:
+  selector:
+    app: event-service
+    version: blue    # CI/CD flips this between blue / green
+  ports:
+    - port: 3001
+      targetPort: 3001
+      protocol: TCP
+  type: ClusterIP
+
+---
+# HorizontalPodAutoscaler for Event Service
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: event-service-hpa
+  namespace: cloud-summit
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: event-service-blue
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70

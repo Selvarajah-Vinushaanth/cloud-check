@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Event - Cloud Summit 2026</title>
+    <!-- Bootstrap 3 -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&family=Raleway:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-spy="scroll" data-target="#navbar-main" data-offset="70">
+
+<!-- Navigation -->
+<nav id="navbar-main" class="navbar navbar-default navbar-fixed-top">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar-collapse">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#home">Cloud Summit 2026</a>
+        </div>
+        <div class="collapse navbar-collapse" id="navbar-collapse">
+            <ul class="nav navbar-nav navbar-right">
+                <li><a href="#home" data-analytics="nav_home">Home</a></li>
+                <li><a href="#videos" data-analytics="nav_videos">Videos</a></li>
+                <li><a href="#speakers" data-analytics="nav_speakers">Speakers</a></li>
+                <li><a href="#programs" data-analytics="nav_programs">Programs</a></li>
+                <li><a href="#register" data-analytics="nav_register">Register</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero / Home Section -->
+<section id="home" class="hero-section">
+    <div class="hero-overlay">
+        <div class="container">
+            <div class="hero-content text-center">
+                <h1 class="hero-title">Cloud Summit 2026</h1>
+                <p class="hero-subtitle">The Premier Cloud Computing Conference</p>
+                <p class="hero-date"><i class="fa fa-calendar"></i> August 15-17, 2026 &nbsp;&nbsp; <i class="fa fa-map-marker"></i> Aberdeen, Scotland</p>
+                <div id="countdown" class="countdown-wrapper"></div>
+                <a href="#register" class="btn btn-primary btn-lg hero-btn" id="hero-register-btn" data-analytics="hero_register_click">
+                    Register Now
+                </a>
+                <a href="#programs" class="btn btn-default btn-lg hero-btn" data-analytics="hero_programs_click">
+                    View Programs
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Watch Videos Section -->
+<section id="videos" class="section-padding">
+    <div class="container">
+        <div class="section-header text-center">
+            <h2>Watch Videos</h2>
+            <p>Catch highlights from previous Cloud Summit events</p>
+            <div class="section-divider"></div>
+        </div>
+        <div class="row">
+            <div class="col-md-4 col-sm-6">
+                <div class="video-card">
+                    <div class="video-thumb" data-video-id="v1" data-analytics="video_play_keynote">
+                        <div class="play-btn"><i class="fa fa-play-circle"></i></div>
+                        <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" alt="Keynote 2025" class="img-responsive">
+                    </div>
+                    <h4>Keynote: Future of Cloud</h4>
+                    <p>The state of cloud computing in 2026 and beyond.</p>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <div class="video-card">
+                    <div class="video-thumb" data-video-id="v2" data-analytics="video_play_kubernetes">
+                        <div class="play-btn"><i class="fa fa-play-circle"></i></div>
+                        <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" alt="Kubernetes Deep Dive" class="img-responsive">
+                    </div>
+                    <h4>Kubernetes Deep Dive</h4>
+                    <p>Advanced patterns in container orchestration.</p>
+                </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+                <div class="video-card">
+                    <div class="video-thumb" data-video-id="v3" data-analytics="video_play_serverless">
+                        <div class="play-btn"><i class="fa fa-play-circle"></i></div>
+                        <img src="https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg" alt="Serverless Architecture" class="img-responsive">
+                    </div>
+                    <h4>Serverless Architecture</h4>
+                    <p>Building event-driven systems at scale.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Creative Speakers Section -->
+<section id="speakers" class="section-padding bg-light">
+    <div class="container">
+        <div class="section-header text-center">
+            <h2>Creative Speakers</h2>
+            <p>Meet the industry experts sharing their knowledge</p>
+            <div class="section-divider"></div>
+        </div>
+        <div class="row" id="speakers-container">
+            <!-- Speakers loaded from Program Service -->
+            <div class="col-md-3 col-sm-6">
+                <div class="speaker-card text-center" data-analytics="speaker_view_1">
+                    <div class="speaker-img">
+                        <img src="https://via.placeholder.com/150" alt="Dr. Sarah Chen" class="img-circle">
+                        <div class="speaker-social">
+                            <a href="#"><i class="fa fa-twitter"></i></a>
+                            <a href="#"><i class="fa fa-linkedin"></i></a>
+                        </div>
+                    </div>
+                    <h4>Dr. Sarah Chen</h4>
+                    <p>AWS Principal Architect</p>
+                    <span class="speaker-tag">Cloud Infrastructure</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="speaker-card text-center" data-analytics="speaker_view_2">
+                    <div class="speaker-img">
+                        <img src="https://via.placeholder.com/150" alt="James Patel" class="img-circle">
+                        <div class="speaker-social">
+                            <a href="#"><i class="fa fa-twitter"></i></a>
+                            <a href="#"><i class="fa fa-linkedin"></i></a>
+                        </div>
+                    </div>
+                    <h4>James Patel</h4>
+                    <p>Google Cloud Engineer</p>
+                    <span class="speaker-tag">Kubernetes & GKE</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="speaker-card text-center" data-analytics="speaker_view_3">
+                    <div class="speaker-img">
+                        <img src="https://via.placeholder.com/150" alt="Aisha Okonkwo" class="img-circle">
+                        <div class="speaker-social">
+                            <a href="#"><i class="fa fa-twitter"></i></a>
+                            <a href="#"><i class="fa fa-linkedin"></i></a>
+                        </div>
+                    </div>
+                    <h4>Aisha Okonkwo</h4>
+                    <p>Microsoft Azure Specialist</p>
+                    <span class="speaker-tag">Microservices</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+                <div class="speaker-card text-center" data-analytics="speaker_view_4">
+                    <div class="speaker-img">
+                        <img src="https://via.placeholder.com/150" alt="Lars Bergman" class="img-circle">
+                        <div class="speaker-social">
+                            <a href="#"><i class="fa fa-twitter"></i></a>
+                            <a href="#"><i class="fa fa-linkedin"></i></a>
+                        </div>
+                    </div>
+                    <h4>Lars Bergman</h4>
+                    <p>ClickHouse Core Dev</p>
+                    <span class="speaker-tag">Analytics & Data</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Our Programs Section -->
+<section id="programs" class="section-padding">
+    <div class="container">
+        <div class="section-header text-center">
+            <h2>Our Programs</h2>
+            <p>Three days packed with workshops, talks, and networking</p>
+            <div class="section-divider"></div>
+        </div>
+        <!-- Event Info Banner -->
+        <div class="event-info-banner" id="event-info">
+            <div class="row text-center">
+                <div class="col-md-3 col-sm-6">
+                    <div class="event-stat">
+                        <i class="fa fa-ticket fa-2x"></i>
+                        <h3 id="ticket-price">£299</h3>
+                        <p>Early Bird Price</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="event-stat">
+                        <i class="fa fa-users fa-2x"></i>
+                        <h3 id="seats-available">Loading...</h3>
+                        <p>Seats Available</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="event-stat">
+                        <i class="fa fa-calendar fa-2x"></i>
+                        <h3>3 Days</h3>
+                        <p>Duration</p>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6">
+                    <div class="event-stat">
+                        <i class="fa fa-microphone fa-2x"></i>
+                        <h3>20+</h3>
+                        <p>Speakers</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Program Tabs -->
+        <ul class="nav nav-tabs program-tabs" id="program-tabs">
+            <li class="active"><a href="#day1" data-toggle="tab" data-analytics="program_tab_day1">Day 1 - Aug 15</a></li>
+            <li><a href="#day2" data-toggle="tab" data-analytics="program_tab_day2">Day 2 - Aug 16</a></li>
+            <li><a href="#day3" data-toggle="tab" data-analytics="program_tab_day3">Day 3 - Aug 17</a></li>
+        </ul>
+        <div class="tab-content program-content" id="program-content">
+            <div class="tab-pane active" id="day1">
+                <!-- Loaded dynamically from Program Service -->
+                <div class="loading-spinner text-center"><i class="fa fa-spinner fa-spin fa-2x"></i></div>
+            </div>
+            <div class="tab-pane" id="day2">
+                <div class="loading-spinner text-center"><i class="fa fa-spinner fa-spin fa-2x"></i></div>
+            </div>
+            <div class="tab-pane" id="day3">
+                <div class="loading-spinner text-center"><i class="fa fa-spinner fa-spin fa-2x"></i></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Register Here Section -->
+<section id="register" class="section-padding bg-primary-custom">
+    <div class="container">
+        <div class="section-header text-center">
+            <h2 class="text-white">Register Here</h2>
+            <p class="text-white">Secure your spot at Cloud Summit 2026</p>
+            <div class="section-divider white"></div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 col-md-offset-3">
+                <div class="register-form-wrapper">
+                    <div id="register-alert" class="alert" style="display:none;"></div>
+                    <form id="registration-form" novalidate>
+                        <div class="form-group">
+                            <label for="reg-name">Full Name *</label>
+                            <input type="text" class="form-control" id="reg-name" placeholder="Your full name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email">Email Address *</label>
+                            <input type="email" class="form-control" id="reg-email" placeholder="your@email.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-tickets">Number of Tickets *</label>
+                            <select class="form-control" id="reg-tickets" required>
+                                <option value="">Select tickets</option>
+                                <option value="1">1 Ticket</option>
+                                <option value="2">2 Tickets</option>
+                                <option value="3">3 Tickets</option>
+                                <option value="4">4 Tickets</option>
+                                <option value="5">5 Tickets</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-event">Event *</label>
+                            <select class="form-control" id="reg-event" required>
+                                <option value="">Loading events...</option>
+                            </select>
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-warning btn-lg btn-block" id="submit-registration" data-analytics="registration_submit">
+                                <i class="fa fa-check"></i> Confirm Registration
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer-section">
+    <div class="container text-center">
+        <p>© 2026 Cloud Summit. All rights reserved. | Built on AWS EKS</p>
+    </div>
+</footer>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+<script src="js/analytics.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

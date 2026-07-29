@@ -1,0 +1,121 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.12-alpine
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  event-service:
+    build: ./services/event-service
+    ports:
+      - "3001:3001"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: events_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      NODE_ENV: development
+      SEATS_LOW_THRESHOLD: "10"
+      # Disable Lambda in local dev (no AWS)
+      SEAT_NOTIFIER_LAMBDA: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  program-service:
+    build: ./services/program-service
+    ports:
+      - "3002:3002"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: programs_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      NODE_ENV: development
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  registration-service:
+    build: ./services/registration-service
+    ports:
+      - "3003:3003"
+    environment:
+      DB_HOST: postgres
+      DB_NAME: registrations_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      NODE_ENV: development
+      EVENT_SERVICE_URL: "http://event-service:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  analytics-collector:
+    build: ./services/analytics-collector
+    ports:
+      - "3004:3004"
+    environment:
+      CLICKHOUSE_HOST: "http://clickhouse:8123"
+      CLICKHOUSE_DATABASE: analytics
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      NODE_ENV: development
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - event-service
+      - program-service
+      - registration-service
+      - analytics-collector
+
+  metabase:
+    image: metabase/metabase:v0.49.0
+    ports:
+      - "3005:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase_db
+      MB_DB_PORT: 5432
+      MB_DB_USER: postgres
+      MB_DB_PASS: postgres
+      MB_DB_HOST: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  clickhouse_data:

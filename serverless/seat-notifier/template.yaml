@@ -1,0 +1,72 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Cloud Summit 2026 - Seat Notifier Lambda + S3 Bucket
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 30
+    MemorySize: 128
+    Environment:
+      Variables:
+        NOTIFICATION_BUCKET: !Ref SeatNotificationBucket
+
+Resources:
+
+  # S3 Bucket for seat notifications
+  SeatNotificationBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "cloudsummit-seat-notifications-${AWS::AccountId}"
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldNotifications
+            Status: Enabled
+            ExpirationInDays: 90
+
+  # Lambda Function
+  SeatNotifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: seat-notifier
+      CodeUri: ./
+      Handler: index.handler
+      Description: "Triggered when event seats drop below threshold. Writes notification to S3."
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref SeatNotificationBucket
+      Tags:
+        Project: CloudSummit2026
+        Environment: production
+
+  # Lambda Resource Policy (allow invocation from VPC / EKS)
+  SeatNotifierInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt SeatNotifierFunction.Arn
+      Principal: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+
+Outputs:
+  SeatNotifierFunctionArn:
+    Description: ARN of the Seat Notifier Lambda
+    Value: !GetAtt SeatNotifierFunction.Arn
+    Export:
+      Name: SeatNotifierFunctionArn
+
+  NotificationBucketName:
+    Description: S3 bucket for seat notifications
+    Value: !Ref SeatNotificationBucket
+    Export:
+      Name: SeatNotificationBucketName

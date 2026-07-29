@@ -1,0 +1,165 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: program-service-blue
+  namespace: cloud-summit
+  labels:
+    app: program-service
+    version: blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: program-service
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: program-service
+        version: blue
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "3002"
+    spec:
+      containers:
+        - name: program-service
+          image: 516962256649.dkr.ecr.ap-south-1.amazonaws.com/program-service:blue
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: programs_db
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: NODE_ENV
+              value: production
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          readinessProbe:
+            httpGet: { path: /health, port: 3002 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 3002 }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: program-service-green
+  namespace: cloud-summit
+  labels:
+    app: program-service
+    version: green
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: program-service
+      version: green
+  template:
+    metadata:
+      labels:
+        app: program-service
+        version: green
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "3002"
+    spec:
+      containers:
+        - name: program-service
+          image: 516962256649.dkr.ecr.ap-south-1.amazonaws.com/program-service:green
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: DB_HOST
+              value: postgres
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: programs_db
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: NODE_ENV
+              value: production
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+          readinessProbe:
+            httpGet: { path: /health, port: 3002 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: program-service
+  namespace: cloud-summit
+spec:
+  selector:
+    app: program-service
+    version: blue
+  ports:
+    - port: 3002
+      targetPort: 3002
+  type: ClusterIP
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: program-service-hpa
+  namespace: cloud-summit
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: program-service-blue
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60

@@ -1,0 +1,212 @@
+---
+# ClickHouse - Open source OLAP database for analytics
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: clickhouse
+  namespace: cloud-summit
+  labels:
+    app: clickhouse
+    tier: analytics
+spec:
+  serviceName: clickhouse
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+        tier: analytics
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9363"
+    spec:
+      containers:
+        - name: clickhouse
+          image: clickhouse/clickhouse-server:23.12-alpine
+          ports:
+            - name: http
+              containerPort: 8123
+            - name: native
+              containerPort: 9000
+            - name: metrics
+              containerPort: 9363
+          env:
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: password
+          volumeMounts:
+            - name: clickhouse-data
+              mountPath: /var/lib/clickhouse
+            - name: clickhouse-config
+              mountPath: /etc/clickhouse-server/config.d/
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 8123
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 8123
+            initialDelaySeconds: 40
+            periodSeconds: 20
+      volumes:
+        - name: clickhouse-config
+          configMap:
+            name: clickhouse-config
+  volumeClaimTemplates:
+    - metadata:
+        name: clickhouse-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp2
+        resources:
+          requests:
+            storage: 30Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  namespace: cloud-summit
+  labels:
+    app: clickhouse
+spec:
+  selector:
+    app: clickhouse
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+    - name: native
+      port: 9000
+      targetPort: 9000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-config
+  namespace: cloud-summit
+data:
+  # Allow connections from within the cluster
+  listen.xml: |
+    <clickhouse>
+      <listen_host>0.0.0.0</listen_host>
+      <http_port>8123</http_port>
+      <tcp_port>9000</tcp_port>
+    </clickhouse>
+  # Prometheus metrics exporter
+  prometheus.xml: |
+    <clickhouse>
+      <prometheus>
+        <endpoint>/metrics</endpoint>
+        <port>9363</port>
+        <metrics>true</metrics>
+        <events>true</events>
+        <asynchronous_metrics>true</asynchronous_metrics>
+      </prometheus>
+    </clickhouse>
+
+---
+# ============================================================
+# Metabase - Analytics Dashboard (connects to ClickHouse)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: metabase
+  namespace: cloud-summit
+  labels:
+    app: metabase
+    tier: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: metabase
+  template:
+    metadata:
+      labels:
+        app: metabase
+        tier: analytics
+    spec:
+      containers:
+        - name: metabase
+          image: metabase/metabase:v0.49.0
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MB_DB_TYPE
+              value: postgres
+            - name: MB_DB_DBNAME
+              value: metabase_db
+            - name: MB_DB_PORT
+              value: "5432"
+            - name: MB_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+            - name: MB_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+            - name: MB_DB_HOST
+              value: postgres
+            - name: JAVA_TIMEZONE
+              value: UTC
+            - name: MB_SITE_NAME
+              value: "Cloud Summit Analytics"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 5
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 90
+            periodSeconds: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metabase
+  namespace: cloud-summit
+  labels:
+    app: metabase
+spec:
+  selector:
+    app: metabase
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP
